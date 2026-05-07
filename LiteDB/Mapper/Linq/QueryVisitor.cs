@@ -193,12 +193,15 @@ namespace LiteDB
             // check if left side is an enum and convert to string before return
             Func<Type, object, BsonValue> convert = (type, value) =>
             {
-                var enumType = (left as UnaryExpression) == null ? null : (left as UnaryExpression).Operand.Type;
-
-                if (enumType != null && enumType.GetTypeInfo().IsEnum)
+                if (value != null)
                 {
-                    var str = Enum.GetName(enumType, value);
-                    return _mapper.Serialize(typeof(string), str, 0);
+                    var enumType = (left as UnaryExpression) == null ? null : (left as UnaryExpression).Operand.Type;
+
+                    if (enumType != null && enumType.GetTypeInfo().IsEnum)
+                    {
+                        var str = Enum.GetName(enumType, value);
+                        return _mapper.Serialize(typeof(string), str, 0);
+                    }
                 }
 
                 return _mapper.Serialize(type, value, 0);
@@ -232,7 +235,14 @@ namespace LiteDB
 
                 // XONE-7891 it's an instance member, proceed normally
                 var mValue = this.VisitValue(mExpr.Expression, left);
-                var value = mValue.AsDocument[mExpr.Member.Name];
+                var mDocument = mValue.AsDocument;
+
+                var value = BsonValue.Null;
+
+                if (mDocument != null)
+                {
+                    value = mDocument[mExpr.Member.Name];
+                }
 
                 return convert(typeof(object), value);
             }
@@ -245,12 +255,22 @@ namespace LiteDB
                 }
             }
 
-            // execute expression
             var objectMember = Expression.Convert(expr, typeof(object));
             var getterLambda = Expression.Lambda<Func<object>>(objectMember);
             var getter = getterLambda.Compile();
 
-            return convert(typeof(object), getter());
+            // execute expression
+            object invokeResult;
+            try
+            {
+                invokeResult = getter();
+            }
+            catch (NullReferenceException)
+            {
+                return BsonValue.Null;
+            }
+
+            return convert(typeof(object), invokeResult);
         }
 
         private Query CreateAndQuery(ref Query[] queries, int startIndex = 0)
