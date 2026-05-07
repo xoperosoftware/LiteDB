@@ -230,7 +230,7 @@ namespace LiteDB
                         staticValue = prop.GetValue(null);
                     }
 
-                    return convert(typeof(object), staticValue);
+                    return convert(mExpr.Type, staticValue);
                 }
 
                 // XONE-7891 it's an instance member, proceed normally
@@ -244,7 +244,7 @@ namespace LiteDB
                     value = mDocument[mExpr.Member.Name];
                 }
 
-                return convert(typeof(object), value);
+                return convert(mExpr.Type, value);
             }
             else if (expr is ParameterExpression)
             {
@@ -270,7 +270,12 @@ namespace LiteDB
                 return BsonValue.Null;
             }
 
-            return convert(typeof(object), invokeResult);
+            // XONE-7891
+            // Use expr.Type instead of typeof(object) so the mapper serializes the actual
+            // expression result type (for example bool, Guid, string) rather than treating
+            // it as a generic object. Using typeof(object) can make LiteDB walk the full
+            // runtime object graph, which may trigger deep/circular serialization errors.
+            return convert(expr.Type, invokeResult);
         }
 
         private Query CreateAndQuery(ref Query[] queries, int startIndex = 0)
