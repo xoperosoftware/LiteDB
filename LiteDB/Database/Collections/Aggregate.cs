@@ -34,7 +34,7 @@ namespace LiteDB
         {
             if (predicate == null) throw new ArgumentNullException(nameof(predicate));
 
-            return this.Count(_visitor.Visit(predicate));
+            return this.Count((new QueryVisitor<T>(_mapper)).Visit(predicate));
         }
 
         #endregion
