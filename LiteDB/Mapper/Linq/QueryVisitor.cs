@@ -200,11 +200,28 @@ namespace LiteDB
                     if (enumType != null && enumType.GetTypeInfo().IsEnum)
                     {
                         var str = Enum.GetName(enumType, value);
-                        return _mapper.Serialize(typeof(string), str, 0);
+
+                        try
+                        {
+                            return _mapper.Serialize(typeof(string), str, 0);
+                        }
+                        catch (LiteException le) when (le.ErrorCode == LiteException.DOCUMENT_MAX_DEPTH)
+                        {
+                            Console.WriteLine( $"Encountered exception while serializing enum {enumType} with value {value}, for expression {expr}, left side {left}" );
+                            throw;
+                        }
                     }
                 }
 
-                return _mapper.Serialize(type, value, 0);
+                try
+                {
+                    return _mapper.Serialize(type, value, 0);
+                }
+                catch (LiteException le) when (le.ErrorCode == LiteException.DOCUMENT_MAX_DEPTH)
+                {
+                    Console.WriteLine( $"Encountered {le.ErrorCode} while serializing {type} with value {value}, for expression {expr}, left side {left}" );
+                    throw;
+                }
             };
 
             // its a constant; Eg: "fixed string"
