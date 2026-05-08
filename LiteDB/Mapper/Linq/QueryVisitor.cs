@@ -97,8 +97,8 @@ namespace LiteDB
                 else if (expr.NodeType == ExpressionType.OrElse)
                 {
                     var bin = expr as BinaryExpression;
-                    var left = this.VisitExpression(bin.Left);
-                    var right = this.VisitExpression(bin.Right);
+                    var left = this.VisitExpression(bin.Left, prefix);
+                    var right = this.VisitExpression(bin.Right, prefix);
 
                     return Query.Or(left, right);
                 }
@@ -231,9 +231,10 @@ namespace LiteDB
 
                 return convert(value.Type, value.Value);
             }
-            else if (expr is MemberExpression mExpr && _parameters.Count > 0)
+            else if (expr is MemberExpression mExpr)
             {
                 // XONE-7891 if Expression is null, it's a static member (like Guid.Empty)
+                // this should always be handled regardless of _parameters context
                 if (mExpr.Expression == null)
                 {
                     object staticValue = null;
@@ -250,18 +251,59 @@ namespace LiteDB
                     return convert(mExpr.Type, staticValue);
                 }
 
-                // XONE-7891 it's an instance member, proceed normally
-                var mValue = this.VisitValue(mExpr.Expression, left);
-                var mDocument = mValue.AsDocument;
-
-                var value = BsonValue.Null;
-
-                if (mDocument != null)
+                // XONE-7891: instance member accessed via _parameters (ParseEnumerableExpression context)
+                if (_parameters.Count > 0)
                 {
-                    value = mDocument[mExpr.Member.Name];
+                    var mValue = this.VisitValue(mExpr.Expression, left);
+                    var mDocument = mValue.AsDocument;
+
+                    var value = BsonValue.Null;
+
+                    if (mDocument != null)
+                    {
+                        value = mDocument[mExpr.Member.Name];
+                    }
+
+                    return convert(mExpr.Type, value);
                 }
 
-                return convert(mExpr.Type, value);
+                // closure variable (e.g. var id = Guid.NewGuid(); x => x.Id == id)
+                // compiler generates a hidden class with a field/property holding the captured value
+                // we must not fall through to the generic Expression.Lambda path with typeof(object)
+                // because it would lose the actual type information and cause incorrect BsonValue serialization
+                try
+                {
+                    object closureValue = null;
+
+                    switch (mExpr.Member)
+                    {
+                        case FieldInfo closureField:
+                        {
+                            // evaluate the closure object first, then get the field value
+                            var closureObject = Expression.Lambda<Func<object>>(
+                                Expression.Convert(mExpr.Expression, typeof(object))
+                            ).Compile()();
+
+                            closureValue = closureField.GetValue(closureObject);
+                            break;
+                        }
+                        case PropertyInfo closureProp:
+                        {
+                            var closureObject = Expression.Lambda<Func<object>>(
+                                Expression.Convert(mExpr.Expression, typeof(object))
+                            ).Compile()();
+
+                            closureValue = closureProp.GetValue(closureObject);
+                            break;
+                        }
+                    }
+
+                    return convert(mExpr.Type, closureValue);
+                }
+                catch
+                {
+                    // if closure evaluation fails for any reason, fall through to generic path below
+                }
             }
             else if (expr is ParameterExpression)
             {
