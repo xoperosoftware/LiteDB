@@ -10,7 +10,7 @@ namespace LiteDB
         private BsonMapper _mapper;
         private Logger _log;
         private List<string> _includes;
-        private QueryVisitor<T> _visitor;
+        private QueryVisitor<T> _visitor => new QueryVisitor<T>( _mapper );
         private MemberMapper _id = null;
         private BsonType _autoId = BsonType.Null;
 
@@ -30,7 +30,12 @@ namespace LiteDB
             _engine = engine;
             _mapper = mapper;
             _log = log;
-            _visitor = new QueryVisitor<T>(mapper);
+
+            // XONE-7891
+            // The initialization of _visitor was moved to the getter because initializing it in the constructor
+            // caused runtime issues.
+            //_visitor = new QueryVisitor<T>(mapper);
+
             _includes = new List<string>();
 
             // if strong typed collection, get _id member mapped (if exists)

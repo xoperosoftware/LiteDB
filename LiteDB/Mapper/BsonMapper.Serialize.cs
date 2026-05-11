@@ -164,14 +164,22 @@ namespace LiteDB
 
                 if (value == null && this.SerializeNullValues == false && member.FieldName != "_id") continue;
 
-                // if member has a custom serialization, use it
-                if (member.Serialize != null)
+                try
                 {
-                    dict[member.FieldName] = member.Serialize(value, this);
+                    // if member has a custom serialization, use it
+                    if (member.Serialize != null)
+                    {
+                        dict[member.FieldName] = member.Serialize(value, this);
+                    }
+                    else
+                    {
+                        dict[member.FieldName] = this.Serialize(member.DataType, value, depth);
+                    }
                 }
-                else
+                catch (LiteException le) when (le.ErrorCode == LiteException.DOCUMENT_MAX_DEPTH)
                 {
-                    dict[member.FieldName] = this.Serialize(member.DataType, value, depth);
+                    Console.WriteLine($"[Depth {depth}] Serializing {t.Name}.{member.FieldName}");
+                    throw;
                 }
             }
 

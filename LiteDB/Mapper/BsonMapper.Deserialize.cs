@@ -132,7 +132,7 @@ namespace LiteDB
             // if value is array, deserialize as array
             else if (value.IsArray)
             {
-                // when array are from an object (like in Dictionary<string, object> { ["array"] = new string[] { "a", "b" } 
+                // when array are from an object (like in Dictionary<string, object> { ["array"] = new string[] { "a", "b" }
                 if (type == typeof(object))
                 {
                     return this.DeserializeArray(typeof(object), value.AsArray);
@@ -165,7 +165,7 @@ namespace LiteDB
 
                     if (actualType == null) throw LiteException.InvalidTypedName(typeField.AsString);
 
-                    // avoid initialize class that are not assignable 
+                    // avoid initialize class that are not assignable
                     if (!type.IsAssignableFrom(actualType))
                     {
                         throw LiteException.DataTypeNotAssignable(type.FullName, actualType.FullName);
