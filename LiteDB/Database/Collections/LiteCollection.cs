@@ -30,7 +30,12 @@ namespace LiteDB
             _engine = engine;
             _mapper = mapper;
             _log = log;
+
+            // XONE-7891
+            // The initialization of _visitor was moved to the getter because initializing it in the constructor
+            // caused runtime issues.
             //_visitor = new QueryVisitor<T>(mapper);
+
             _includes = new List<string>();
 
             // if strong typed collection, get _id member mapped (if exists)
